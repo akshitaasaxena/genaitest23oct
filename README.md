@@ -119,11 +119,14 @@ python3 -m http.server 3000          # serve the frontend
 
 ### Questions 1–4 (Incorporation year, Price update date, Physics textbook, Minister of Education)
 
-![Q1–Q4 results](screenshots/qa_1_2_3_4.png)
+<img width="1470" height="956" alt="Screenshot 2026-10-23 at 4 52 02 PM" src="https://github.com/user-attachments/assets/bebac577-8a8b-4d32-9a71-7c262410c263" />
+
+
 
 ### Question 5 ("Best" history book for a beginner)
 
-![Q5 result](screenshots/qa_5.png)
+<img width="812" height="253" alt="Screenshot 2026-10-23 at 4 55 01 PM" src="https://github.com/user-attachments/assets/2b35a882-8167-46a7-ad6e-8f6ccd8ca218" />
+
 
 ---
 
