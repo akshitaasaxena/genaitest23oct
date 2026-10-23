@@ -1,0 +1,25 @@
+# Environment — never commit secrets
+.env
+
+# Chroma vector database (large binary files, regenerate with ingest.py)
+db/
+
+# The PDF is large (44 MB) — exclude from repo
+History_2024-25.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.idea/

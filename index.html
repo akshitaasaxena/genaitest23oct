@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orient BlackSwan History Catalogue Assistant</title>
+  <meta name="description" content="AI-powered catalogue assistant for Orient BlackSwan's history collection." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --amber-deep:   #3d1f05;
+      --amber-mid:    #7a3b10;
+      --amber-warm:   #c07830;
+      --amber-gold:   #d4a24a;
+      --amber-light:  #f0c97a;
+      --parchment:    #fdf3e3;
+      --glass-bg:     rgba(30,12,2,0.55);
+      --glass-border: rgba(212,162,74,0.30);
+      --glass-shadow: rgba(0,0,0,0.60);
+      --text-primary: #fdf3e3;
+      --text-muted:   rgba(240,201,122,0.65);
+      --bubble-user:  rgba(192,120,48,0.82);
+      --bubble-bot:   rgba(45,22,6,0.88);
+      --bubble-err:   rgba(120,30,30,0.85);
+    }
+    html,body { width:100%; height:100%; overflow:hidden; background:#1a0a02; font-family:'Inter',system-ui,sans-serif; }
+    #bg-canvas { position:fixed; inset:0; z-index:0; display:block; }
+    .vignette  { position:fixed; inset:0; z-index:1; background:radial-gradient(ellipse 80% 80% at 50% 50%,transparent 30%,rgba(10,4,0,0.70) 100%); pointer-events:none; }
+    .page { position:relative; z-index:2; width:100%; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem; }
+    .chat-card { width:100%; max-width:720px; height:min(82vh,760px); display:flex; flex-direction:column; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:20px; backdrop-filter:blur(22px) saturate(1.4); -webkit-backdrop-filter:blur(22px) saturate(1.4); box-shadow:0 8px 48px var(--glass-shadow),0 0 0 1px rgba(212,162,74,0.08) inset,0 1px 0 rgba(255,220,140,0.12) inset; overflow:hidden; }
+    .chat-header { padding:1.25rem 1.6rem 1rem; border-bottom:1px solid var(--glass-border); background:linear-gradient(135deg,rgba(122,59,16,0.40) 0%,rgba(30,12,2,0.20) 100%); flex-shrink:0; }
+    .header-inner { display:flex; align-items:center; gap:0.85rem; }
+    .header-icon { width:42px; height:42px; flex-shrink:0; background:linear-gradient(135deg,var(--amber-gold),var(--amber-warm)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.35rem; box-shadow:0 2px 12px rgba(212,162,74,0.40); }
+    .header-text h1 { font-family:'Playfair Display',Georgia,serif; font-size:clamp(0.9rem,2.2vw,1.1rem); font-weight:700; color:var(--amber-light); line-height:1.2; letter-spacing:0.01em; }
+    .header-text p  { font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem; letter-spacing:0.03em; }
+    .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#5dbb63; box-shadow:0 0 6px #5dbb63; margin-right:5px; animation:pulse-dot 2.4s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:0.35} }
+    .chat-messages { flex:1; overflow-y:auto; padding:1.25rem 1.4rem; display:flex; flex-direction:column; gap:1rem; scroll-behavior:smooth; }
+    .chat-messages::-webkit-scrollbar{width:5px}
+    .chat-messages::-webkit-scrollbar-track{background:rgba(30,12,2,0.4);border-radius:4px}
+    .chat-messages::-webkit-scrollbar-thumb{background:rgba(212,162,74,0.45);border-radius:4px}
+    .msg-wrapper { display:flex; flex-direction:column; animation:msg-pop 0.36s cubic-bezier(0.34,1.56,0.64,1) both; }
+    @media(prefers-reduced-motion:reduce){.msg-wrapper{animation-duration:0.01ms}}
+    @keyframes msg-pop { from{opacity:0;transform:translateY(14px) scale(0.97)}to{opacity:1;transform:none} }
+    .msg-wrapper.user  { align-items:flex-end; }
+    .msg-wrapper.bot   { align-items:flex-start; }
+    .msg-wrapper.error { align-items:flex-start; }
+    .bubble { max-width:78%; padding:0.75rem 1rem; border-radius:16px; font-size:0.9rem; line-height:1.6; word-wrap:break-word; white-space:pre-wrap; }
+    .msg-wrapper.user  .bubble { background:var(--bubble-user); color:var(--parchment); border-bottom-right-radius:4px; box-shadow:0 2px 12px rgba(192,120,48,0.35); }
+    .msg-wrapper.bot   .bubble { background:var(--bubble-bot);  color:var(--text-primary); border-bottom-left-radius:4px; border:1px solid rgba(212,162,74,0.15); box-shadow:0 2px 12px rgba(0,0,0,0.40); }
+    .msg-wrapper.error .bubble { background:var(--bubble-err);  color:#ffb3b3; border-bottom-left-radius:4px; border:1px solid rgba(200,80,80,0.30); }
+    .sources-caption { margin-top:0.3rem; font-size:0.72rem; color:var(--text-muted); padding-left:0.25rem; }
+    .thinking-wrapper { display:flex; align-items:flex-start; animation:msg-pop 0.28s ease both; }
+    @media(prefers-reduced-motion:reduce){.thinking-wrapper{animation:none}}
+    .thinking-bubble { background:var(--bubble-bot); border:1px solid rgba(212,162,74,0.15); border-bottom-left-radius:4px; border-radius:16px; padding:0.8rem 1.1rem; display:flex; align-items:center; gap:5px; box-shadow:0 2px 12px rgba(0,0,0,0.40); }
+    .dot { width:7px; height:7px; background:var(--amber-gold); border-radius:50%; animation:bounce-dot 1.2s ease-in-out infinite; }
+    @media(prefers-reduced-motion:reduce){.dot{animation:none;opacity:0.7}}
+    .dot:nth-child(1){animation-delay:0s}
+    .dot:nth-child(2){animation-delay:0.18s}
+    .dot:nth-child(3){animation-delay:0.36s}
+    @keyframes bounce-dot{0%,80%,100%{transform:translateY(0);opacity:0.4}40%{transform:translateY(-7px);opacity:1}}
+    .chat-input-area { flex-shrink:0; padding:1rem 1.25rem 1.2rem; border-top:1px solid var(--glass-border); background:rgba(20,8,1,0.45); }
+    .input-row { display:flex; align-items:flex-end; gap:0.65rem; background:rgba(255,255,255,0.05); border:1px solid rgba(212,162,74,0.22); border-radius:14px; padding:0.6rem 0.6rem 0.6rem 1rem; transition:border-color 0.2s,box-shadow 0.2s; }
+    .input-row:focus-within { border-color:rgba(212,162,74,0.55); box-shadow:0 0 0 3px rgba(212,162,74,0.10); }
+    #user-input { flex:1; background:transparent; border:none; outline:none; color:var(--parchment); font-family:inherit; font-size:0.9rem; line-height:1.5; resize:none; max-height:120px; overflow-y:auto; caret-color:var(--amber-gold); }
+    #user-input::placeholder{color:var(--text-muted)}
+    #user-input::-webkit-scrollbar{width:3px}
+    #user-input::-webkit-scrollbar-thumb{background:rgba(212,162,74,0.45);border-radius:2px}
+    #send-btn { flex-shrink:0; width:40px; height:40px; background:linear-gradient(135deg,var(--amber-gold),var(--amber-warm)); border:none; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--amber-deep); font-size:1.1rem; transition:transform 0.15s,box-shadow 0.15s,opacity 0.2s; box-shadow:0 2px 10px rgba(212,162,74,0.40); }
+    #send-btn:hover:not(:disabled){transform:scale(1.07);box-shadow:0 4px 18px rgba(212,162,74,0.55)}
+    #send-btn:active:not(:disabled){transform:scale(0.96)}
+    #send-btn:disabled{opacity:0.45;cursor:not-allowed}
+    .send-icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .welcome{text-align:center;padding:1.5rem 1rem;color:var(--text-muted);font-size:0.84rem;line-height:1.7}
+    .welcome strong{display:block;font-family:'Playfair Display',serif;font-size:1rem;color:var(--amber-light);margin-bottom:0.4rem}
+    .brand-corner{position:fixed;top:1.2rem;left:1.4rem;z-index:3;font-family:'Playfair Display',serif;font-size:0.78rem;color:rgba(212,162,74,0.45);letter-spacing:0.12em;text-transform:uppercase;pointer-events:none;user-select:none}
+  </style>
+</head>
+<body>
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<p class="brand-corner">Orient BlackSwan</p>
+<main class="page">
+  <section class="chat-card" role="main" aria-label="Chatbot interface">
+    <header class="chat-header">
+      <div class="header-inner">
+        <div class="header-icon" aria-hidden="true">📚</div>
+        <div class="header-text">
+          <h1>Orient BlackSwan History Catalogue Assistant</h1>
+          <p><span class="status-dot" aria-hidden="true"></span>AI-powered catalogue search</p>
+        </div>
+      </div>
+    </header>
+    <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+      <div class="welcome">
+        <strong>Welcome to the Catalogue</strong>
+        Ask me anything about the Orient BlackSwan history collection — books, authors, dates, themes, or specific catalogue entries.
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <div class="input-row">
+        <textarea id="user-input" rows="1" placeholder="Ask about a book, author, or historical topic…" aria-label="Your message" autocomplete="off" spellcheck="true"></textarea>
+        <button id="send-btn" aria-label="Send message" title="Send (Enter)">
+          <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+(function(){
+  const canvas=document.getElementById('bg-canvas');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x1a0a02,1);
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,200);
+  camera.position.set(0,0,28);
+  scene.add(new THREE.AmbientLight(0x3d1f05,3.5));
+  const pA=new THREE.PointLight(0xd4a24a,4,80);pA.position.set(15,10,5);scene.add(pA);
+  const pB=new THREE.PointLight(0xc07830,2.5,60);pB.position.set(-12,-8,10);scene.add(pB);
+  const N=900,pos=new Float32Array(N*3),sz=new Float32Array(N),S=55;
+  for(let i=0;i<N;i++){pos[i*3]=(Math.random()-0.5)*S;pos[i*3+1]=(Math.random()-0.5)*S;pos[i*3+2]=(Math.random()-0.5)*S;sz[i]=Math.random()*2.8+0.6;}
+  const pGeo=new THREE.BufferGeometry();
+  pGeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  pGeo.setAttribute('size',new THREE.BufferAttribute(sz,1));
+  const pMat=new THREE.PointsMaterial({color:0xd4a24a,size:0.18,transparent:true,opacity:0.55,sizeAttenuation:true,depthWrite:false});
+  const particles=new THREE.Points(pGeo,pMat);scene.add(particles);
+  const bookColors=[0xc07830,0x7a3b10,0xd4a24a,0x8b4513,0xa0522d,0xcd853f];
+  const books=[];
+  for(let i=0;i<18;i++){
+    const geo=new THREE.BoxGeometry(1.2+Math.random()*1.8,2.0+Math.random()*2.5,0.12+Math.random()*0.18);
+    const mat=new THREE.MeshStandardMaterial({color:bookColors[Math.floor(Math.random()*bookColors.length)],roughness:0.88,metalness:0.08,transparent:true,opacity:0.28+Math.random()*0.20});
+    const mesh=new THREE.Mesh(geo,mat);
+    const r=8+Math.random()*18,theta=Math.random()*Math.PI*2,phi=(Math.random()-0.5)*Math.PI;
+    mesh.position.set(r*Math.cos(theta)*Math.cos(phi),r*Math.sin(phi),r*Math.sin(theta)*Math.cos(phi)-5);
+    mesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    const speed=0.0008+Math.random()*0.0012,fa=0.4+Math.random()*0.8,ff=0.4+Math.random()*0.6,fo=Math.random()*Math.PI*2;
+    books.push({mesh,speed,fa,ff,fo,baseY:mesh.position.y});scene.add(mesh);
+  }
+  const rings=[];
+  for(let i=0;i<6;i++){
+    const geo=new THREE.TorusGeometry(4+i*2.8,0.04+Math.random()*0.05,8,80);
+    const mat=new THREE.MeshStandardMaterial({color:0xd4a24a,roughness:0.6,metalness:0.3,transparent:true,opacity:0.06+Math.random()*0.06});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.rotation.x=Math.random()*Math.PI;mesh.rotation.y=Math.random()*Math.PI;
+    rings.push({mesh,speed:0.00025+Math.random()*0.0003});scene.add(mesh);
+  }
+  const slow=window.matchMedia('(prefers-reduced-motion:reduce)').matches?0.08:1;
+  let t=0;
+  function animate(){
+    requestAnimationFrame(animate);t+=0.016*slow;
+    particles.rotation.y+=0.00018*slow;particles.rotation.x+=0.00008*slow;
+    books.forEach(b=>{b.mesh.rotation.x+=b.speed*slow;b.mesh.rotation.y+=b.speed*0.7*slow;b.mesh.position.y=b.baseY+Math.sin(t*b.ff+b.fo)*b.fa;});
+    rings.forEach(r=>{r.mesh.rotation.z+=r.speed*slow;r.mesh.rotation.x+=r.speed*0.4*slow;});
+    camera.position.x=Math.sin(t*0.04)*1.2;camera.position.y=Math.sin(t*0.028)*0.8;camera.lookAt(0,0,0);
+    renderer.render(scene,camera);
+  }
+  animate();
+  window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+})();
+</script>
+<script>
+(function(){
+  const API='http://localhost:8000/ask';
+  const msgEl=document.getElementById('chat-messages');
+  const inp=document.getElementById('user-input');
+  const btn=document.getElementById('send-btn');
+  inp.addEventListener('input',()=>{inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,120)+'px';});
+  inp.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();go();}});
+  btn.addEventListener('click',go);
+  function disable(v){btn.disabled=v;inp.disabled=v;}
+  function scroll(){msgEl.scrollTo({top:msgEl.scrollHeight,behavior:'smooth'});}
+  function userBubble(txt){
+    const w=document.createElement('div');w.className='msg-wrapper user';
+    const b=document.createElement('div');b.className='bubble';b.textContent=txt;
+    w.appendChild(b);msgEl.appendChild(w);scroll();
+  }
+  function botBubble(ans,src){
+    const w=document.createElement('div');w.className='msg-wrapper bot';w.setAttribute('role','article');
+    const b=document.createElement('div');b.className='bubble';b.textContent=ans;w.appendChild(b);
+    if(Array.isArray(src)&&src.length>0){const c=document.createElement('p');c.className='sources-caption';c.textContent='Source: '+src.join(', ');w.appendChild(c);}
+    msgEl.appendChild(w);scroll();
+  }
+  function errBubble(msg){
+    const w=document.createElement('div');w.className='msg-wrapper error';
+    const b=document.createElement('div');b.className='bubble';b.textContent=msg||'Something went wrong — please try again.';
+    w.appendChild(b);msgEl.appendChild(w);scroll();
+  }
+  function showThink(){
+    const w=document.createElement('div');w.id='thinking';w.className='thinking-wrapper';w.setAttribute('aria-label','Assistant is thinking');
+    const b=document.createElement('div');b.className='thinking-bubble';
+    for(let i=0;i<3;i++){const d=document.createElement('span');d.className='dot';d.setAttribute('aria-hidden','true');b.appendChild(d);}
+    w.appendChild(b);msgEl.appendChild(w);scroll();
+  }
+  function hideThink(){const e=document.getElementById('thinking');if(e)e.remove();}
+  async function go(){
+    const txt=inp.value.trim();if(!txt)return;
+    inp.value='';inp.style.height='auto';disable(true);
+    userBubble(txt);showThink();
+    try{
+      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:txt})});
+      if(!res.ok){
+        let em='Something went wrong — please try again.';
+        try{const eb=await res.json();if(eb&&eb.detail)em='Error: '+eb.detail;}catch(_){}
+        hideThink();errBubble(em);
+      } else {
+        const d=await res.json();hideThink();
+        botBubble(d&&d.answer?d.answer:'(No answer returned)',d&&Array.isArray(d.sources)?d.sources:[]);
+      }
+    }catch(e){hideThink();errBubble('Something went wrong — please try again.');}
+    finally{disable(false);inp.focus();}
+  }
+  inp.focus();
+})();
+</script>
+</body>
+</html>
